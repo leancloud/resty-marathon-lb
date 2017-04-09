@@ -1,0 +1,48 @@
+# vim: set ft=bash:
+
+{
+  # BEGIN Build Brotil
+  append_env_extras NGX_BROTLI_STATIC_MODULE_ONLY=1
+  append_ld_rpath mods/libbrotli/brotli
+
+  download-module libbrotli https://github.com/bagder/libbrotli master
+
+  pushd mods/libbrotli
+  ./autogen.sh
+  ./configure
+  make
+  popd
+  # END Build Brotil
+  build-static-module ngx_brotli \
+    https://github.com/google/ngx_brotli master
+}
+
+build-static-module ngx_http_dyups_module \
+  https://github.com/yzprofile/ngx_http_dyups_module.git v0.2.9
+
+{
+    build-static-module nginx_upstream_check_module \
+        https://github.com/yaoweibin/nginx_upstream_check_module master
+
+    cat mods/nginx_upstream_check_module/$CHECK_MODULE_PATCH | \
+        (cd openresty-*/bundle/nginx-*/src; patch -N -p1) || true
+
+    curl https://patch-diff.githubusercontent.com/raw/yaoweibin/nginx_upstream_check_module/pull/93.patch | \
+        (cd mods/nginx_upstream_check_module; patch -N -p1) || true
+
+    cat <<EOF | (cd mods/nginx_upstream_check_module; patch -N -p1) || true
+diff --git a/ngx_http_upstream_check_module.c b/ngx_http_upstream_check_module.c
+index 0187f68..da52c79 100644
+--- a/ngx_http_upstream_check_module.c
++++ b/ngx_http_upstream_check_module.c
+@@ -3558,7 +3558,7 @@ ngx_http_upstream_check(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+     fall = 5;
+     interval = 30000;
+     timeout = 1000;
+-    default_down = 1;
++    default_down = 0;
+     unique = 0;
+
+     value = cf->args->elts;
+EOF
+}
